@@ -1,0 +1,46 @@
+{
+    "author": "birkoof, hal3e",
+    "dependencies": {},
+    "keywords": [],
+    "name": "tea-timer",
+    "pebble": {
+        "displayName": "Ihlas Graz",
+        "enableMultiJS": false,
+        "messageKeys": {
+            "dummy": 0
+        },
+        "projectType": "native",
+        "resources": {
+            "media": [
+                {
+                    "file": "data/salah.dat",
+                    "name": "RESOURCE_ID_SALAH",
+                    "targetPlatforms": null,
+                    "type": "raw"
+                },
+                {
+                    "file": "images/tea-sign.png",
+                    "name": "TEA_SIGN",
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/ihlas-graz-icon.png",
+                    "menuIcon": true,
+                    "name": "IMAGE_ICON",
+                    "type": "bitmap"
+                }
+            ]
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk"
+        ],
+        "uuid": "87b47c77-1cbd-47d8-916d-09a2192c1c55",
+        "watchapp": {
+            "watchface": false
+        }
+    },
+    "version": "1.0.0"
+}
