@@ -1,6 +1,7 @@
 #include <pebble.h>
 
 #define TEA_TEXT_GAP 14
+#define NUM_PREY_TIMES 6
 
 static Window *s_menu_window, *s_countdown_window, *s_wakeup_window;
 static MenuLayer *s_menu_layer;
@@ -22,8 +23,10 @@ typedef struct
 
 typedef struct
 {
-  Salah salahs_ [6];
+  Salah salahs_ [NUM_PREY_TIMES];
 } Day;
+
+uint8_t next_prayer_time = 0;
 
 
 typedef struct {
@@ -52,7 +55,7 @@ enum {
 static void read_current_day(){
           // Load the current day
 
- time_t t = time(NULL);
+   time_t t = time(NULL);
    struct tm tm = *localtime(&t);
    APP_LOG(APP_LOG_LEVEL_DEBUG, "day: %d.%d.%d\n\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900);
 
@@ -80,6 +83,16 @@ static void read_current_day(){
   APP_LOG(APP_LOG_LEVEL_DEBUG, "  asr:      %02d:%02d\n", day_.salahs_[3].hour, day_.salahs_[3].minute);
   APP_LOG(APP_LOG_LEVEL_DEBUG, "  magrib:   %02d:%02d\n", day_.salahs_[4].hour, day_.salahs_[4].minute);
   APP_LOG(APP_LOG_LEVEL_DEBUG, "  isha:     %02d:%02d\n\n", day_.salahs_[5].hour, day_.salahs_[5].minute);
+  
+  // Get indes of the next prayer time
+  for(size_t i = 0; i<NUM_PREY_TIMES; i++)
+  {
+    if( (day_.salahs_[i].hour == tm.tm_hour && day_.salahs_[i].minute > tm.tm_min) || day_.salahs_[i].hour >  tm.tm_hour )
+    {
+      next_prayer_time = i;
+      break;
+    }
+  }
 }
 
 static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_index,
@@ -113,7 +126,7 @@ static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_inde
 
 static uint16_t get_sections_count_callback(struct MenuLayer *menulayer, uint16_t section_index,
                                             void *callback_context) {
-  return 6;
+  return NUM_PREY_TIMES;
 }
 
 #ifdef PBL_ROUND
@@ -167,7 +180,10 @@ static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *
   //menu_cell_title_draw(ctx, cell_layer, s_tea_text);
   
   menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(s_tea_text, name),
-                      PBL_IF_ROUND_ELSE(name, NULL), NULL);
+                     PBL_IF_ROUND_ELSE(name, NULL), NULL);
+  
+//   menu_cell_basic_draw(ctx, cell_layer, name,
+//                       NULL, NULL);
 }
 
 static void menu_window_load(Window *window) {
@@ -175,13 +191,20 @@ static void menu_window_load(Window *window) {
   GRect bounds = layer_get_bounds(window_layer);
 
   s_menu_layer = menu_layer_create(bounds);
-  menu_layer_set_highlight_colors(s_menu_layer, GColorTiffanyBlue, GColorWhite);
+  
+  menu_layer_set_highlight_colors(s_menu_layer, GColorPictonBlue, GColorBlack);
+  
   menu_layer_set_callbacks(s_menu_layer, NULL, (MenuLayerCallbacks){
     .get_num_rows = get_sections_count_callback,
     .get_cell_height = PBL_IF_ROUND_ELSE(get_cell_height_callback, NULL),
     .draw_row = draw_row_handler,
     //.select_click = select_callback
   });
+  
+  // Move manu to next prayer time
+  MenuIndex m_i = {0, next_prayer_time};
+  menu_layer_set_selected_index(s_menu_layer, m_i, MenuRowAlignCenter , false);
+  
   menu_layer_set_click_config_onto_window(s_menu_layer,	window);
   layer_add_child(window_layer, menu_layer_get_layer(s_menu_layer));
 
