@@ -113,8 +113,7 @@ static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_inde
 
 static uint16_t get_sections_count_callback(struct MenuLayer *menulayer, uint16_t section_index,
                                             void *callback_context) {
-  int count = sizeof(tea_array) / sizeof(TeaInfo);
-  return count;
+  return 6;
 }
 
 #ifdef PBL_ROUND
@@ -126,15 +125,49 @@ static int16_t get_cell_height_callback(MenuLayer *menu_layer, MenuIndex *cell_i
 
 static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index,
                              void *callback_context) {
-  char* name = tea_array[cell_index->row].name;
+  char* name;
+  switch(cell_index->row) {
+
+   case 0 :
+      name = "Fajr";
+      break;
+    
+   case 1 :
+      name = "Sunrise";
+      break;
+    
+    case 2  :
+      name = "Zuhr";
+      break;
+    
+    case 3  :
+      name = "Asr";
+      break;
+    
+    case 4  :
+      name = "Magrib";
+      break;
+    
+    case 5  :
+      name = "Isha";
+      break;
+    
+   default : 
+     name = "noName";
+  }
+
   int text_gap_size = TEA_TEXT_GAP - strlen(name);
-  int mins = tea_array[cell_index->row].mins;
 
   // Using simple space padding between name and s_tea_text for appearance of edge-alignment
-  snprintf(s_tea_text, sizeof(s_tea_text), "%s%*s%d min", PBL_IF_ROUND_ELSE("", name),
-           PBL_IF_ROUND_ELSE(0, text_gap_size), "", mins);
-  menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(name, s_tea_text),
-                       PBL_IF_ROUND_ELSE(s_tea_text, NULL), NULL);
+  snprintf(s_tea_text, sizeof(s_tea_text), "%s%*s%02d:%02d", PBL_IF_ROUND_ELSE("", name),
+           PBL_IF_ROUND_ELSE(0, text_gap_size), "", day_.salahs_[cell_index->row].hour, day_.salahs_[cell_index->row].minute);
+  //menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(name, s_tea_text),
+  //                     PBL_IF_ROUND_ELSE(s_tea_text, NULL), NULL);
+  
+  //menu_cell_title_draw(ctx, cell_layer, s_tea_text);
+  
+  menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(s_tea_text, name),
+                      PBL_IF_ROUND_ELSE(name, NULL), NULL);
 }
 
 static void menu_window_load(Window *window) {
@@ -142,11 +175,12 @@ static void menu_window_load(Window *window) {
   GRect bounds = layer_get_bounds(window_layer);
 
   s_menu_layer = menu_layer_create(bounds);
+  menu_layer_set_highlight_colors(s_menu_layer, GColorTiffanyBlue, GColorWhite);
   menu_layer_set_callbacks(s_menu_layer, NULL, (MenuLayerCallbacks){
     .get_num_rows = get_sections_count_callback,
     .get_cell_height = PBL_IF_ROUND_ELSE(get_cell_height_callback, NULL),
     .draw_row = draw_row_handler,
-    .select_click = select_callback
+    //.select_click = select_callback
   });
   menu_layer_set_click_config_onto_window(s_menu_layer,	window);
   layer_add_child(window_layer, menu_layer_get_layer(s_menu_layer));

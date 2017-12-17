@@ -13,12 +13,6 @@
         "resources": {
             "media": [
                 {
-                    "file": "data/salah.dat",
-                    "name": "RESOURCE_ID_SALAH",
-                    "targetPlatforms": null,
-                    "type": "raw"
-                },
-                {
                     "file": "images/tea-sign.png",
                     "name": "TEA_SIGN",
                     "type": "bitmap"
@@ -28,6 +22,18 @@
                     "menuIcon": true,
                     "name": "IMAGE_ICON",
                     "type": "bitmap"
+                },
+                {
+                    "file": "data/salah.dat",
+                    "name": "SALAH",
+                    "targetPlatforms": [
+                        "aplite",
+                        "basalt",
+                        "chalk",
+                        "diorite",
+                        "emery"
+                    ],
+                    "type": "raw"
                 }
             ]
         },
