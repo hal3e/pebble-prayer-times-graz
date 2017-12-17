@@ -3,6 +3,7 @@
 #define TEA_TEXT_GAP 14
 #define NUM_PREY_TIMES 6
 
+///--------------------------------------------------------------------------------------------------///
 static Window *s_menu_window, *s_countdown_window, *s_wakeup_window;
 static MenuLayer *s_menu_layer;
 static TextLayer *s_error_text_layer, *s_tea_text_layer, *s_countdown_text_layer,
@@ -15,25 +16,29 @@ static time_t s_wakeup_timestamp = 0;
 static char s_tea_text[32];
 static char s_countdown_text[32];
 
+///--------------------------------------------------------------------------------------------------///
 typedef struct
 {
   uint8_t hour;
   uint8_t minute;
 } Salah;
 
+///--------------------------------------------------------------------------------------------------///
 typedef struct
 {
   Salah salahs_ [NUM_PREY_TIMES];
 } Day;
 
+///--------------------------------------------------------------------------------------------------///
 uint8_t next_prayer_time = 0;
 
-
+///--------------------------------------------------------------------------------------------------///
 typedef struct {
   char name[16];  // Name of this tea
   int mins;       // Minutes to steep this tea
 } TeaInfo;
 
+///--------------------------------------------------------------------------------------------------///
 // Array of different teas for tea timer
 // {<Tea Name>, <Brew time in minutes>}
 TeaInfo tea_array[] = {
@@ -46,12 +51,47 @@ TeaInfo tea_array[] = {
   {"Chai Tea", 10}
 };
 
-Day day_;
-
+///--------------------------------------------------------------------------------------------------///
 enum {
   PERSIST_WAKEUP // Persistent storage key for wakeup_id
 };
 
+///--------------------------------------------------------------------------------------------------///
+Day day_;
+
+///--------------------------------------------------------------------------------------------------///
+// Forward declarations
+static void read_current_day();
+static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_index,
+                            void *callback_context);
+static uint16_t get_sections_count_callback(struct MenuLayer *menulayer, uint16_t section_index,
+                                            void *callback_context);
+static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index,
+                             void *callback_context);
+static void menu_window_load(Window *window);
+static void menu_window_unload(Window *window);
+static void timer_handler(void *data);
+static void countdown_back_handler(ClickRecognizerRef recognizer, void *context);
+static void countdown_cancel_handler(ClickRecognizerRef recognizer, void *context);
+static void countdown_click_config_provider(void *context);
+static void countdown_window_load(Window *window);
+static void countdown_window_unload(Window *window);
+static void wakeup_click_handler(ClickRecognizerRef recognizer, void *context);
+static void wakeup_click_config_provider(void *context);
+static void wakeup_window_load(Window *window);
+static void wakeup_window_unload(Window *window);
+static void wakeup_handler(WakeupId id, int32_t reason);
+static void init(void);
+static void deinit(void);
+
+///--------------------------------------------------------------------------------------------------///
+int main(void) {
+  init();
+  app_event_loop();
+  deinit();
+}
+
+///--------------------------------------------------------------------------------------------------///
 static void read_current_day(){
           // Load the current day
 
@@ -75,7 +115,7 @@ static void read_current_day(){
   resource_load_byte_range(handle, specific_day * sizeof(Day), buffer, sizeof(Day));
   memcpy(&day_, buffer, sizeof(Day));
 
-  //free(buffer);
+  free(buffer);
 
   APP_LOG(APP_LOG_LEVEL_DEBUG, "  fajr:     %02d:%02d\n", day_.salahs_[0].hour, day_.salahs_[0].minute);
   APP_LOG(APP_LOG_LEVEL_DEBUG, "  sunrise:  %02d:%02d\n", day_.salahs_[1].hour, day_.salahs_[1].minute);
@@ -95,6 +135,7 @@ static void read_current_day(){
   }
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_index,
                             void *callback_context) {
   // If we were displaying s_error_text_layer, remove it and return
@@ -124,11 +165,13 @@ static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_inde
   window_stack_push(s_countdown_window, false);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static uint16_t get_sections_count_callback(struct MenuLayer *menulayer, uint16_t section_index,
                                             void *callback_context) {
   return NUM_PREY_TIMES;
 }
 
+///--------------------------------------------------------------------------------------------------///
 #ifdef PBL_ROUND
 static int16_t get_cell_height_callback(MenuLayer *menu_layer, MenuIndex *cell_index,
                                         void *callback_context) {
@@ -136,6 +179,7 @@ static int16_t get_cell_height_callback(MenuLayer *menu_layer, MenuIndex *cell_i
 }
 #endif
 
+///--------------------------------------------------------------------------------------------------///
 static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index,
                              void *callback_context) {
   char* name;
@@ -186,6 +230,8 @@ static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *
 //                       NULL, NULL);
 }
 
+
+///--------------------------------------------------------------------------------------------------///
 static void menu_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
@@ -218,11 +264,13 @@ static void menu_window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(s_error_text_layer));
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void menu_window_unload(Window *window) {
   menu_layer_destroy(s_menu_layer);
   text_layer_destroy(s_error_text_layer);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void timer_handler(void *data) {
   if (s_wakeup_timestamp == 0) {
     // get the wakeup timestamp for showing a countdown
@@ -234,10 +282,12 @@ static void timer_handler(void *data) {
   app_timer_register(1000, timer_handler, data);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void countdown_back_handler(ClickRecognizerRef recognizer, void *context) {
   window_stack_pop_all(true); // Exit app while waiting for tea to brew
 }
 
+///--------------------------------------------------------------------------------------------------///
 // Cancel the current wakeup event on the countdown screen
 static void countdown_cancel_handler(ClickRecognizerRef recognizer, void *context) {
   wakeup_cancel(s_wakeup_id);
@@ -246,11 +296,13 @@ static void countdown_cancel_handler(ClickRecognizerRef recognizer, void *contex
   window_stack_pop(true); // Go back to tea selection window
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void countdown_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_BACK, countdown_back_handler);
   window_single_click_subscribe(BUTTON_ID_DOWN, countdown_cancel_handler);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void countdown_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
@@ -278,17 +330,20 @@ static void countdown_window_load(Window *window) {
   app_timer_register(0, timer_handler, NULL);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void countdown_window_unload(Window *window) {
   text_layer_destroy(s_countdown_text_layer);
   text_layer_destroy(s_cancel_text_layer);
   text_layer_destroy(s_tea_text_layer);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void wakeup_click_handler(ClickRecognizerRef recognizer, void *context) {
   // Exit app after tea is done
   window_stack_pop_all(true);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void wakeup_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_SELECT, wakeup_click_handler);
   window_single_click_subscribe(BUTTON_ID_UP, wakeup_click_handler);
@@ -296,6 +351,7 @@ static void wakeup_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_BACK, wakeup_click_handler);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void wakeup_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
@@ -309,11 +365,13 @@ static void wakeup_window_load(Window *window) {
   layer_add_child(window_layer, bitmap_layer_get_layer(s_bitmap_layer));
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void wakeup_window_unload(Window *window) {
   gbitmap_destroy(s_tea_bitmap);
   bitmap_layer_destroy(s_bitmap_layer);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void wakeup_handler(WakeupId id, int32_t reason) {
   //Delete persistent storage value
   persist_delete(PERSIST_WAKEUP);
@@ -321,6 +379,7 @@ static void wakeup_handler(WakeupId id, int32_t reason) {
   vibes_double_pulse();
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void init(void) {
   bool wakeup_scheduled = false;
 
@@ -375,12 +434,7 @@ static void init(void) {
   wakeup_service_subscribe(wakeup_handler);
 }
 
+///--------------------------------------------------------------------------------------------------///
 static void deinit(void) {
   window_destroy(s_menu_window);
-}
-
-int main(void) {
-  init();
-  app_event_loop();
-  deinit();
 }
