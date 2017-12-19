@@ -6,14 +6,15 @@
 ///--------------------------------------------------------------------------------------------------///
 static Window *s_menu_window, *s_countdown_window, *s_wakeup_window;
 static MenuLayer *s_menu_layer;
-static TextLayer *s_error_text_layer, *s_tea_text_layer, *s_countdown_text_layer,
+static TextLayer *s_status_text_layer, *s_error_text_layer, *s_salah_text_layer, *s_countdown_text_layer,
                  *s_cancel_text_layer;
 static BitmapLayer *s_bitmap_layer;
 static GBitmap *s_tea_bitmap;
 
 static WakeupId s_wakeup_id = -1;
 static time_t s_wakeup_timestamp = 0;
-static char s_tea_text[32];
+static char s_salah_text[32];
+static char s_time_text[6];
 static char s_countdown_text[32];
 
 ///--------------------------------------------------------------------------------------------------///
@@ -63,12 +64,9 @@ struct tm tm_;
 ///--------------------------------------------------------------------------------------------------///
 // Forward declarations
 static void read_current_day();
-static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_index,
-                            void *callback_context);
-static uint16_t get_sections_count_callback(struct MenuLayer *menulayer, uint16_t section_index,
-                                            void *callback_context);
-static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index,
-                             void *callback_context);
+static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_index, void *callback_context);
+static uint16_t get_sections_count_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context);
+static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context);
 static void menu_window_load(Window *window);
 static void menu_window_unload(Window *window);
 static void timer_handler(void *data);
@@ -125,6 +123,7 @@ static void read_current_day(){
     next_prayer_time = 0;
     specific_day += 1;
     tm_.tm_mday += 1;
+    
     // If we went over the current month, update month and set day to 1
     if(tm_.tm_mday > month[tm_.tm_mon])
     {
@@ -134,15 +133,13 @@ static void read_current_day(){
     
   }
 
-   // Read the second set of 8 bytes
+   // Read the specific day from the raw file
   uint8_t* buffer = (uint8_t*)malloc(sizeof(Day));
-
   resource_load_byte_range(handle, specific_day * sizeof(Day), buffer, sizeof(Day));
   memcpy(&day_, buffer, sizeof(Day));
-
   free(buffer);
   
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "day: %d.%d.%d\n\n", tm_.tm_mday, tm_.tm_mon + 1, tm_.tm_year + 1900);
+//   APP_LOG(APP_LOG_LEVEL_DEBUG, "day: %d.%d.%d\n\n", tm_.tm_mday, tm_.tm_mon + 1, tm_.tm_year + 1900);
 
 //   APP_LOG(APP_LOG_LEVEL_DEBUG, "  fajr:     %02d:%02d\n", day_.salahs_[0].hour, day_.salahs_[0].minute);
 //   APP_LOG(APP_LOG_LEVEL_DEBUG, "  sunrise:  %02d:%02d\n", day_.salahs_[1].hour, day_.salahs_[1].minute);
@@ -202,46 +199,39 @@ static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *
                              void *callback_context) {
   char* name;
   switch(cell_index->row) {
-
    case 0 :
       name = "Fajr";
       break;
-    
    case 1 :
       name = "Sunrise";
       break;
-    
     case 2  :
       name = "Zuhr";
       break;
-    
     case 3  :
       name = "Asr";
       break;
-    
     case 4  :
       name = "Magrib";
       break;
-    
     case 5  :
       name = "Isha";
       break;
-    
    default : 
      name = "noName";
   }
 
   int text_gap_size = TEA_TEXT_GAP - strlen(name);
 
-  // Using simple space padding between name and s_tea_text for appearance of edge-alignment
-  snprintf(s_tea_text, sizeof(s_tea_text), "%s%*s%02d:%02d", PBL_IF_ROUND_ELSE("", name),
+  // Using simple space padding between name and s_salah_text for appearance of edge-alignment
+  snprintf(s_salah_text, sizeof(s_salah_text), "%s%*s%02d:%02d", PBL_IF_ROUND_ELSE("", name),
            PBL_IF_ROUND_ELSE(0, text_gap_size), "", day_.salahs_[cell_index->row].hour, day_.salahs_[cell_index->row].minute);
-  //menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(name, s_tea_text),
-  //                     PBL_IF_ROUND_ELSE(s_tea_text, NULL), NULL);
+  //menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(name, s_salah_text),
+  //                     PBL_IF_ROUND_ELSE(s_salah_text, NULL), NULL);
   
-  //menu_cell_title_draw(ctx, cell_layer, s_tea_text);
+  //menu_cell_title_draw(ctx, cell_layer, s_salah_text);
   
-  menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(s_tea_text, name),
+  menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(s_salah_text, name),
                      PBL_IF_ROUND_ELSE(name, NULL), NULL);
   
 //   menu_cell_basic_draw(ctx, cell_layer, name,
@@ -280,6 +270,14 @@ static void menu_window_load(Window *window) {
   text_layer_set_background_color(s_error_text_layer, GColorBlack);
   layer_set_hidden(text_layer_get_layer(s_error_text_layer), true);
   layer_add_child(window_layer, text_layer_get_layer(s_error_text_layer));
+  
+  s_status_text_layer = text_layer_create((GRect) { .origin = {0, 5}, .size = {bounds.size.w, 15}});
+  snprintf(s_time_text, sizeof(s_time_text), "%02d:%02d", tm_.tm_hour, tm_.tm_min);
+  text_layer_set_text(s_status_text_layer, s_time_text);
+  text_layer_set_text_alignment(s_status_text_layer, GTextAlignmentCenter);
+  text_layer_set_font(s_status_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_color(s_status_text_layer, GColorBlack);
+  layer_add_child(window_layer, text_layer_get_layer(s_status_text_layer));
 }
 
 ///--------------------------------------------------------------------------------------------------///
@@ -327,10 +325,10 @@ static void countdown_window_load(Window *window) {
 
   window_set_click_config_provider(window, countdown_click_config_provider);
 
-  s_tea_text_layer = text_layer_create(GRect(0, 32, bounds.size.w, 20));
-  text_layer_set_text(s_tea_text_layer, "Steeping time left");
-  text_layer_set_text_alignment(s_tea_text_layer, GTextAlignmentCenter);
-  layer_add_child(window_layer, text_layer_get_layer(s_tea_text_layer));
+  s_salah_text_layer = text_layer_create(GRect(0, 32, bounds.size.w, 20));
+  text_layer_set_text(s_salah_text_layer, "Steeping time left");
+  text_layer_set_text_alignment(s_salah_text_layer, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(s_salah_text_layer));
 
   s_countdown_text_layer = text_layer_create(GRect(0, 72, bounds.size.w, 20));
   text_layer_set_text(s_countdown_text_layer, s_countdown_text);
@@ -352,7 +350,7 @@ static void countdown_window_load(Window *window) {
 static void countdown_window_unload(Window *window) {
   text_layer_destroy(s_countdown_text_layer);
   text_layer_destroy(s_cancel_text_layer);
-  text_layer_destroy(s_tea_text_layer);
+  text_layer_destroy(s_salah_text_layer);
 }
 
 ///--------------------------------------------------------------------------------------------------///
