@@ -30,7 +30,7 @@ typedef struct
 } Day;
 
 ///--------------------------------------------------------------------------------------------------///
-uint8_t next_prayer_time = 0;
+int8_t next_prayer_time = -1;
 
 ///--------------------------------------------------------------------------------------------------///
 typedef struct {
@@ -58,6 +58,7 @@ enum {
 
 ///--------------------------------------------------------------------------------------------------///
 Day day_;
+struct tm tm_;
 
 ///--------------------------------------------------------------------------------------------------///
 // Forward declarations
@@ -96,18 +97,42 @@ static void read_current_day(){
           // Load the current day
 
    time_t t = time(NULL);
-   struct tm tm = *localtime(&t);
-   APP_LOG(APP_LOG_LEVEL_DEBUG, "day: %d.%d.%d\n\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900);
+   tm_ = *localtime(&t);
 
    char month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
    ResHandle handle = resource_get_handle(RESOURCE_ID_SALAH);
 
    int specific_day = -1;
-   for(int m = 0; m < tm.tm_mon; m++)
+   for(int m = 0; m < tm_.tm_mon; m++)
       specific_day += month[m];
 
-   specific_day += tm.tm_mday;
+   specific_day += tm_.tm_mday;
+  
+  // Get index of the next prayer time
+  for(size_t i = 0; i<NUM_PREY_TIMES; i++)
+  {
+    if( (day_.salahs_[i].hour == tm_.tm_hour && day_.salahs_[i].minute > tm_.tm_min) || day_.salahs_[i].hour >  tm_.tm_hour )
+    {
+      next_prayer_time = i;
+      break;
+    }
+  }
+  
+  // If next_prayer_time was not updated it means we are past isha of the current day and we will move to the next day
+  if(next_prayer_time == -1)
+  {
+    next_prayer_time = 0;
+    specific_day += 1;
+    tm_.tm_mday += 1;
+    // If we went over the current month, update month and set day to 1
+    if(tm_.tm_mday > month[tm_.tm_mon])
+    {
+      tm_.tm_mday = 1;
+      tm_.tm_mon += 1;
+    }
+    
+  }
 
    // Read the second set of 8 bytes
   uint8_t* buffer = (uint8_t*)malloc(sizeof(Day));
@@ -116,23 +141,16 @@ static void read_current_day(){
   memcpy(&day_, buffer, sizeof(Day));
 
   free(buffer);
-
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "  fajr:     %02d:%02d\n", day_.salahs_[0].hour, day_.salahs_[0].minute);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "  sunrise:  %02d:%02d\n", day_.salahs_[1].hour, day_.salahs_[1].minute);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "  zuhr:     %02d:%02d\n", day_.salahs_[2].hour, day_.salahs_[2].minute);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "  asr:      %02d:%02d\n", day_.salahs_[3].hour, day_.salahs_[3].minute);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "  magrib:   %02d:%02d\n", day_.salahs_[4].hour, day_.salahs_[4].minute);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "  isha:     %02d:%02d\n\n", day_.salahs_[5].hour, day_.salahs_[5].minute);
   
-  // Get indes of the next prayer time
-  for(size_t i = 0; i<NUM_PREY_TIMES; i++)
-  {
-    if( (day_.salahs_[i].hour == tm.tm_hour && day_.salahs_[i].minute > tm.tm_min) || day_.salahs_[i].hour >  tm.tm_hour )
-    {
-      next_prayer_time = i;
-      break;
-    }
-  }
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "day: %d.%d.%d\n\n", tm_.tm_mday, tm_.tm_mon + 1, tm_.tm_year + 1900);
+
+//   APP_LOG(APP_LOG_LEVEL_DEBUG, "  fajr:     %02d:%02d\n", day_.salahs_[0].hour, day_.salahs_[0].minute);
+//   APP_LOG(APP_LOG_LEVEL_DEBUG, "  sunrise:  %02d:%02d\n", day_.salahs_[1].hour, day_.salahs_[1].minute);
+//   APP_LOG(APP_LOG_LEVEL_DEBUG, "  zuhr:     %02d:%02d\n", day_.salahs_[2].hour, day_.salahs_[2].minute);
+//   APP_LOG(APP_LOG_LEVEL_DEBUG, "  asr:      %02d:%02d\n", day_.salahs_[3].hour, day_.salahs_[3].minute);
+//   APP_LOG(APP_LOG_LEVEL_DEBUG, "  magrib:   %02d:%02d\n", day_.salahs_[4].hour, day_.salahs_[4].minute);
+//   APP_LOG(APP_LOG_LEVEL_DEBUG, "  isha:     %02d:%02d\n\n", day_.salahs_[5].hour, day_.salahs_[5].minute);
+  
 }
 
 ///--------------------------------------------------------------------------------------------------///
