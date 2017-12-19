@@ -15,6 +15,7 @@ static WakeupId s_wakeup_id = -1;
 static time_t s_wakeup_timestamp = 0;
 static char s_salah_text[32];
 static char s_time_text[6];
+static char s_date_text[11];
 static char s_countdown_text[32];
 
 ///--------------------------------------------------------------------------------------------------///
@@ -107,6 +108,11 @@ static void read_current_day(){
 
    specific_day += tm_.tm_mday;
   
+  // Read the specific day from the raw file
+  uint8_t* buffer = (uint8_t*)malloc(sizeof(Day));
+  resource_load_byte_range(handle, specific_day * sizeof(Day), buffer, sizeof(Day));
+  memcpy(&day_, buffer, sizeof(Day));
+  
   // Get index of the next prayer time
   for(size_t i = 0; i<NUM_PREY_TIMES; i++)
   {
@@ -116,7 +122,7 @@ static void read_current_day(){
       break;
     }
   }
-  
+
   // If next_prayer_time was not updated it means we are past isha of the current day and we will move to the next day
   if(next_prayer_time == -1)
   {
@@ -131,12 +137,10 @@ static void read_current_day(){
       tm_.tm_mon += 1;
     }
     
+    resource_load_byte_range(handle, specific_day * sizeof(Day), buffer, sizeof(Day));
+    memcpy(&day_, buffer, sizeof(Day));  
   }
-
-   // Read the specific day from the raw file
-  uint8_t* buffer = (uint8_t*)malloc(sizeof(Day));
-  resource_load_byte_range(handle, specific_day * sizeof(Day), buffer, sizeof(Day));
-  memcpy(&day_, buffer, sizeof(Day));
+  
   free(buffer);
   
 //   APP_LOG(APP_LOG_LEVEL_DEBUG, "day: %d.%d.%d\n\n", tm_.tm_mday, tm_.tm_mon + 1, tm_.tm_year + 1900);
@@ -181,16 +185,14 @@ static void select_callback(struct MenuLayer *s_menu_layer, MenuIndex *cell_inde
 }
 
 ///--------------------------------------------------------------------------------------------------///
-static uint16_t get_sections_count_callback(struct MenuLayer *menulayer, uint16_t section_index,
-                                            void *callback_context) {
-  return NUM_PREY_TIMES;
+static uint16_t get_sections_count_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context) {
+  return NUM_PREY_TIMES + 1;
 }
 
 ///--------------------------------------------------------------------------------------------------///
 #ifdef PBL_ROUND
-static int16_t get_cell_height_callback(MenuLayer *menu_layer, MenuIndex *cell_index,
-                                        void *callback_context) {
-  return 60;
+static int16_t get_cell_height_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context) {
+  return 55;
 }
 #endif
 
@@ -200,21 +202,25 @@ static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *
   char* name;
   switch(cell_index->row) {
    case 0 :
+    snprintf(s_date_text, sizeof(s_date_text), "%02d.%02d.%d", tm_.tm_mday, tm_.tm_mon + 1, tm_.tm_year + 1900);
+    name = s_date_text;
+    break;
+   case 1 :
       name = "Fajr";
       break;
-   case 1 :
+   case 2 :
       name = "Sunrise";
       break;
-    case 2  :
+    case 3  :
       name = "Zuhr";
       break;
-    case 3  :
+    case 4  :
       name = "Asr";
       break;
-    case 4  :
+    case 5  :
       name = "Magrib";
       break;
-    case 5  :
+    case 6  :
       name = "Isha";
       break;
    default : 
@@ -224,15 +230,18 @@ static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *
   int text_gap_size = TEA_TEXT_GAP - strlen(name);
 
   // Using simple space padding between name and s_salah_text for appearance of edge-alignment
-  snprintf(s_salah_text, sizeof(s_salah_text), "%s%*s%02d:%02d", PBL_IF_ROUND_ELSE("", name),
-           PBL_IF_ROUND_ELSE(0, text_gap_size), "", day_.salahs_[cell_index->row].hour, day_.salahs_[cell_index->row].minute);
-  //menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(name, s_salah_text),
-  //                     PBL_IF_ROUND_ELSE(s_salah_text, NULL), NULL);
-  
-  //menu_cell_title_draw(ctx, cell_layer, s_salah_text);
-  
-  menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(s_salah_text, name),
-                     PBL_IF_ROUND_ELSE(name, NULL), NULL);
+  if(cell_index->row != 0)
+  {
+    snprintf(s_salah_text, sizeof(s_salah_text), "%s%*s%02d:%02d", PBL_IF_ROUND_ELSE("", name),
+             PBL_IF_ROUND_ELSE(0, text_gap_size), "", day_.salahs_[cell_index->row - 1].hour, day_.salahs_[cell_index->row  - 1].minute);
+    
+    menu_cell_basic_draw(ctx, cell_layer, PBL_IF_ROUND_ELSE(s_salah_text, name),
+                       PBL_IF_ROUND_ELSE(name, NULL), NULL);    
+  }
+  else {
+    menu_cell_basic_draw(ctx, cell_layer,NULL , name, NULL);
+  }
+
   
 //   menu_cell_basic_draw(ctx, cell_layer, name,
 //                       NULL, NULL);
@@ -256,7 +265,7 @@ static void menu_window_load(Window *window) {
   });
   
   // Move manu to next prayer time
-  MenuIndex m_i = {0, next_prayer_time};
+  MenuIndex m_i = {0, next_prayer_time + 1};
   menu_layer_set_selected_index(s_menu_layer, m_i, MenuRowAlignCenter , false);
   
   menu_layer_set_click_config_onto_window(s_menu_layer,	window);
@@ -271,7 +280,7 @@ static void menu_window_load(Window *window) {
   layer_set_hidden(text_layer_get_layer(s_error_text_layer), true);
   layer_add_child(window_layer, text_layer_get_layer(s_error_text_layer));
   
-  s_status_text_layer = text_layer_create((GRect) { .origin = {0, 5}, .size = {bounds.size.w, 15}});
+  s_status_text_layer = text_layer_create((GRect) { .origin = {1, 5}, .size = {bounds.size.w, 15}});
   snprintf(s_time_text, sizeof(s_time_text), "%02d:%02d", tm_.tm_hour, tm_.tm_min);
   text_layer_set_text(s_status_text_layer, s_time_text);
   text_layer_set_text_alignment(s_status_text_layer, GTextAlignmentCenter);
