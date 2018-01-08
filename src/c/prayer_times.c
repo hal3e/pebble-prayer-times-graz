@@ -135,6 +135,13 @@ static void read_current_day(){
     {
       tm_.tm_mday = 1;
       tm_.tm_mon += 1;
+      
+      // If we went over the current year, update year and set month to 0
+      if(tm_.tm_mon > 11)
+      {
+        tm_.tm_mon = 0;
+        tm_.tm_year += 1;
+      }
     }
     
     resource_load_byte_range(handle, specific_day * sizeof(Day), buffer, sizeof(Day));
